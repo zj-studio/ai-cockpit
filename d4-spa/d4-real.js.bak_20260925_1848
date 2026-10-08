@@ -1,0 +1,328 @@
+/* D4 真实数据覆盖层 (d4-real.js) v011 — 只改数值/数据源，不动视觉；失败显示「数据接入中」 */
+"use strict";
+(function(){
+  function el(s){ return document.querySelector(s); }
+  function esc(t){ return String(t==null?"":t).replace(/[&<>"]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;'})[c]}); }
+  var NS="http://www.w3.org/2000/svg";
+  var lastD=null, lastDash=null;
+
+    function isDirtySource(src){
+    return /测试|test|demo|临时/i.test(String(src||""));
+  }
+  function bySource(dash){
+    var a=(dash&&dash.artifacts&&Array.isArray(dash.artifacts.by_source_app))?dash.artifacts.by_source_app:[];
+    return a.filter(function(x){ return !isDirtySource(x.source_app); }).slice().sort(function(x,y){return (y.count||0)-(x.count||0);});
+  }
+  function cleanedArtifactTotal(dash){
+    var sum=0; bySource(dash).forEach(function(x){ sum+=(x.count||0); }); return sum;
+  }
+  function shortSrc(src){
+    var s=String(src||"");
+    if(s.indexOf("客服")>=0) return "客服";
+    if(s.indexOf("产品")>=0||s.indexOf("小明")>=0) return "产品";
+    if(s.indexOf("华安")>=0) return "开发1";
+    if(s.indexOf("小强")>=0) return "开发2";
+    if(s.indexOf("助理")>=0||s.indexOf("小墨")>=0) return "助理";
+    if(s.indexOf("文案")>=0||s.indexOf("如花")>=0) return "文案";
+    if(s.indexOf("运维")>=0) return "运维";
+    if(s.indexOf("商机")>=0) return "商机";
+    if(s.indexOf("图片")>=0||s.indexOf("设计")>=0) return "设计";
+    if(s.indexOf("视频")>=0) return "视频";
+    if(s.indexOf("测试")>=0) return "测试";
+    return s.replace(/[（()）]/g,"").slice(0,4);
+  }
+  function setHtml(sel,html){ var n=el(sel); if(n) n.innerHTML=html; }
+
+  /* 任务吞吐迷你折线（近6日 by_day） */
+  function drawThp(svg,dash){
+    var byDay=(dash&&dash.tasks&&Array.isArray(dash.tasks.by_day))?dash.tasks.by_day:[];
+    var vals=byDay.map(function(b){return b.count;}); if(!vals.length) return;
+    var W=120,H=40,pad=2,max=1; vals.forEach(function(v){ if(v>max)max=v; });
+    var aPath="M0,"+H, ln="";
+    vals.forEach(function(v,i){ var x=i/(vals.length-1)*W, y=H-(v/max)*(H-pad*2)-pad;
+      aPath+=" L"+x.toFixed(1)+" "+y.toFixed(1); ln+=(i?"L":"M")+x.toFixed(1)+" "+y.toFixed(1); });
+    aPath+=" L"+W+","+H+" Z";
+    var a=document.createElementNS(NS,"path"); a.setAttribute("d",aPath); a.setAttribute("fill","rgba(59,231,255,.10)");
+    var p=document.createElementNS(NS,"path"); p.setAttribute("d",ln); p.setAttribute("fill","none");
+    p.setAttribute("stroke","#3BE7FF"); p.setAttribute("stroke-width",2); p.setAttribute("stroke-linejoin","round"); p.setAttribute("stroke-linecap","round");
+    p.style.filter="drop-shadow(0 0 4px rgba(59,231,255,.6))";
+    var lv=vals[vals.length-1],ly=H-(lv/max)*(H-pad*2)-pad;
+    var c=document.createElementNS(NS,"circle"); c.setAttribute("cx",W); c.setAttribute("cy",ly); c.setAttribute("r",3); c.setAttribute("fill","#3BE7FF");
+    svg.innerHTML=""; svg.appendChild(a); svg.appendChild(p); svg.appendChild(c);
+  }
+  /* 各岗成果微柱 */
+  function drawArts(box,dash){
+    var src=bySource(dash); if(!src.length) return;
+    var max=1; src.forEach(function(x){ if(x.count>max)max=x.count; });
+    box.innerHTML="";
+    src.slice(0,10).forEach(function(x){
+      var d=document.createElement("div"); d.className="mb";
+      d.style.background="linear-gradient(180deg,#E63A84,#9B7BFF)"; d.title=esc(x.source_app)+" "+x.count;
+      d.setAttribute("data-h",(x.count/max*100).toFixed(1)); box.appendChild(d);
+    });
+    requestAnimationFrame(function(){setTimeout(function(){ Array.prototype.forEach.call(box.children,function(b){ b.style.height=b.getAttribute("data-h")+"%" }); },160); });
+  }
+  /* 最近操作记录：audit by_event_type 前4微柱 */
+  function drawAudit(box,dash){
+    var bet=(dash&&dash.audit&&dash.audit.by_event_type)?dash.audit.by_event_type:null;
+    if(!bet) return;
+    var items=Object.keys(bet).map(function(k){return {k:k,v:bet[k]};}).sort(function(a,b){return b.v-a.v;}).slice(0,4);
+    if(!items.length) return;
+    var W=120,H=40,pad=2,max=1; items.forEach(function(x){ if(x.v>max)max=x.v; });
+    var bw=W/items.length;
+    var html=items.map(function(x,i){
+      var h=(x.v/max)*(H-pad*2); var y=H-h-pad/2;
+      return '<rect x="'+(i*bw+2)+'" y="'+y+'" width="'+(bw-4)+'" height="'+h+'" rx="1.5" fill="#9B7BFF" opacity="0.85"><title>'+esc(x.k)+' '+x.v+'</title></rect>';
+    }).join("");
+    box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+html+'</svg>';
+  }
+  /* 多指标带四格 */
+  function fillMiv(totalTasks,rate,dash,d){
+    var miv=document.querySelectorAll("#miv .mc-v");
+    if(miv&&miv.length>=4){
+      if(miv[0]) miv[0].innerHTML=(totalTasks==null?"—":totalTasks)+"<small>单/日</small>";
+      var artTotal=cleanedArtifactTotal(dash);
+      if(miv[1]) miv[1].innerHTML=artTotal+"<small>件</small>";
+      if(rate!=null&&miv[2]) miv[2].innerHTML=rate+"<small>%</small>";
+      var au=(dash&&dash.audit&&typeof dash.audit.total==="number")?dash.audit.total:"—";
+      if(miv[3]) miv[3].innerHTML=au+"<small>条</small>";
+    }
+    var thp=el("#mivThp"); if(thp) drawThp(thp,dash);
+    var arts=el("#mivArts"); if(arts) drawArts(arts,dash);
+    var aud=el("#mivAudit"); if(aud) drawAudit(aud,dash);
+  }
+  /* 各岗位成果柱状图 */
+  function renderBars(bars,dash){
+    var src=bySource(dash); if(!src.length) return;
+    var max=1; src.forEach(function(x){ if(x.count>max)max=x.count; });
+    bars.innerHTML=src.map(function(x){
+      var h=(x.count/max*100);
+      return '<div class=\"bcol\" data-src=\"'+esc(x.source_app)+'\"><span class=\"bv\">'+x.count+'</span>'+
+        '<div class=\"bstack\" data-h=\"'+h+'\"><div class=\"a\" style=\"flex:'+x.count+'\"></div></div><span class=\"bl\">'+esc(shortSrc(x.source_app))+'</span></div>';
+    }).join("");
+    requestAnimationFrame(function(){setTimeout(function(){
+      Array.prototype.forEach.call(bars.querySelectorAll(".bstack"),function(e){e.style.height=e.getAttribute("data-h")+"%"});
+    },80);});
+  }
+  /* 待办与挂起：真实待审批 */
+  function renderAlerts(alerts,d,dash){
+    var pe=(d&&d.approvals&&Array.isArray(d.approvals.pending_exec))?d.approvals.pending_exec:[];
+    if(!pe.length){ alerts.innerHTML='<div class=\"ov-krow\"><span class=\"tt\" style=\"color:var(--txt-3)\">暂无待审批</span></div>'; return; }
+    alerts.innerHTML=pe.map(function(t){
+      var who=String(t.target_app||"").replace(/^交付实施部-/, "");
+      var st=t.approval==="returned"?"已打回":"待审批";
+      var col=t.approval==="returned"?"var(--violet)":"var(--amber)";
+      return '<div class=\"ov-krow\" data-r=\"approval\"><span class=\"ad\" style=\"background:'+col+'\"></span>'+
+        '<span class=\"tt\">'+esc(st+' · '+who)+'</span><span class=\"cost\">'+esc((t.created_at||"").slice(0,10))+'</span>'+
+        '<span class=\"who\">待审</span></div>';
+    }).join("");
+    Array.prototype.forEach.call(alerts.querySelectorAll(".ov-krow"),function(r){r.onclick=function(){location.hash="#tasks";}});
+  }
+  /* 近7日任务走势 */
+  function renderTrend(svg,dash){
+    var byDay=(dash&&dash.tasks&&Array.isArray(dash.tasks.by_day))?dash.tasks.by_day:[];
+    var vals=byDay.map(function(b){return b.count;}); if(!vals.length) return;
+    var W=320,H=200,pad=18,n=vals.length;
+    var max=1; vals.forEach(function(v){ if(v>max)max=v; });
+    function xy(arr){return arr.map(function(v,i){return [i*(W-2*pad)/(n-1)+pad,H-pad-(v/max)*(H-2*pad)];});}
+    var pT=xy(vals);
+    function line(ps){return "M"+ps.map(function(p){return p[0]+" "+p[1]}).join(" L");}
+    var dT=line(pT), areaT=dT+" L"+pT[n-1][0]+" "+(H-pad)+" L"+pT[0][0]+" "+(H-pad)+" Z";
+    svg.innerHTML='<defs><linearGradient id=\"ovagT2\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">'+
+      '<stop offset=\"0\" stop-color=\"#3BE7FF\" stop-opacity=\".4\"/><stop offset=\"1\" stop-color=\"#3BE7FF\" stop-opacity=\"0\"/></linearGradient></defs>'+
+      [0,1,2,3].map(function(g){var y=pad+g*(H-2*pad)/3;return '<line x1=\"0\" y1=\"'+y+'\" x2=\"320\" y2=\"'+y+'\" stroke=\"rgba(133,160,255,.15)\" stroke-dasharray=\"4 5\"/>';}).join("")+
+      '<path d=\"'+areaT+'\" fill=\"url(#ovagT2)\"/>'+
+      '<path class=\"ovtl\" d=\"'+dT+'\" fill=\"none\" stroke=\"#3BE7FF\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>'+
+      pT.map(function(p){return '<circle cx=\"'+p[0]+'\" cy=\"'+p[1]+'\" r=\"3\" fill=\"#0a0f20\" stroke=\"#3BE7FF\" stroke-width=\"1.6\"/>';}).join("");
+  }
+  /* 系统健康 6 行真值 */
+  function fillHealth(d,dash){
+    var hc=document.querySelectorAll("#ov2 .ov-panel .ov-lst .ov-krow .hc");
+    if(!hc||hc.length<6) return;
+    var srv=Array.isArray(d.services)?d.services:[];
+    var okN=srv.filter(function(s){return Number(s.status)>=200&&Number(s.status)<400;}).length;
+    var pct=srv.length?Math.round(okN/srv.length*10000)/100:null;
+    if(pct!=null) hc[0].textContent=pct.toFixed(2)+"%";
+    var sec=(dash&&dash.audit&&typeof dash.audit.security_events==="number")?dash.audit.security_events:null;
+    if(sec!=null) hc[1].textContent=sec+" 条";
+    var tokens=(d.usage&&d.usage.tokens_today)?d.usage.tokens_today:0;
+    hc[2].textContent= tokens>0?(tokens/10000).toFixed(1)+" 万":"今日无消耗";
+    var bocha=(d.usage&&d.usage.bocha&&typeof d.usage.bocha.remaining==="number")?d.usage.bocha.remaining:null;
+    if(bocha!=null) hc[3].textContent=(Number(bocha)/10).toFixed(1)+"%";
+    var dur=(dash&&dash.tasks&&dash.tasks.duration_seconds&&typeof dash.tasks.duration_seconds.avg==="number")?dash.tasks.duration_seconds.avg:null;
+    if(dur!=null) hc[4].textContent=dur+" 秒";
+    var disp=(dash&&dash.audit&&dash.audit.by_event_type&&typeof dash.audit.by_event_type["dispatch.completed"]==="number")?dash.audit.by_event_type["dispatch.completed"]:null;
+    if(disp!=null) hc[5].textContent=disp+" 次";
+  }
+  /* 异常哨兵：真实判定 */
+  function fillSentinel(waitN,d,dash){
+    var box=el("#ovSentinel"); if(!box) return;
+    var sec=(dash&&dash.audit&&typeof dash.audit.security_events==="number")?dash.audit.security_events:0;
+    var alertFlag=(d.usage&&d.usage.bocha&&d.usage.bocha.alert)?true:false;
+    var level="ok", txt="系统自运行，无需干预", col="#3DDCA0";
+    if(alertFlag||(sec>20)){ level="err"; txt="Token 告急 / 安全事件较多，请关注"; col="#FF4D97"; }
+    else if(waitN>0){ level="warn"; txt=waitN+" 条待你审批 · 待办与挂起"; col="#FFC24D"; }
+    box.style.display="flex";
+    box.style.background= level==="ok"?"rgba(61,220,160,.10)":(level==="warn"?"rgba(255,194,77,.10)":"rgba(255,77,151,.14)");
+    box.style.border="1px solid "+col;
+    box.innerHTML='<span style=\"width:9px;height:9px;border-radius:50%;flex:none;background:'+col+';box-shadow:0 0 10px '+col+'\"></span>'+
+      '<span style=\"flex:1;color:var(--txt-2)\">'+esc(txt)+'</span>'+
+      (level!=="ok"?'<span style=\"color:'+col+';font-weight:700\">前往处理 →</span>':"");
+    box.onclick=function(){ if(level!=="ok") location.hash="#tasks"; };
+  }
+
+  function applyReal(d, dash){
+    if(!d||typeof d!=="object") throw new Error("no data");
+    lastD=d; lastDash=dash;
+    var emps=(Array.isArray(d.employees)?d.employees:[]);
+    var onlineReal=emps.filter(function(e){return e.status==="online";}).length;
+
+    var totalTasks=null, doneN=null, waitN=null, rate=null;
+    if(dash&&dash.tasks){
+      totalTasks=dash.tasks.total;
+      var bs=dash.tasks.by_status;
+      if(bs){ doneN=(bs.done||0)+(bs.closed||0); waitN=(bs.pending||0)+(bs.pending_exec||0)+(bs.pending_deps||0); }
+      var rr=+(Number(dash.tasks.success_rate||0)*100).toFixed(1);
+      rate=isFinite(rr)?rr:null;
+    }
+    if(totalTasks==null&&d.tasks){ totalTasks=(d.tasks.queued||0)+(d.tasks.running||0)+(d.tasks.done_today||0); }
+    var tokens=(d.usage&&d.usage.tokens_today)?d.usage.tokens_today:0;
+    var tokWan=(tokens/10000).toFixed(1);
+
+    /* KPI 5 卡 */
+    var kpis=document.querySelectorAll(".ov-kpis .ov-kpi .kv");
+    if(kpis&&kpis.length>=5){
+      kpis[0].innerHTML=onlineReal+"<small>/"+emps.length+"</small>";
+      kpis[1].innerHTML=(totalTasks==null?"—":totalTasks)+"<small>单</small>";
+      kpis[2].innerHTML=(doneN==null?"—":doneN)+"<small>单 · "+(rate==null?"—":rate)+"%</small>";
+      kpis[3].innerHTML=(waitN==null?"—":waitN)+"<small>条</small>";
+      kpis[4].innerHTML=tokWan+"<small>万</small>";
+      var kt=document.querySelectorAll(".ov-kpis .ov-kpi .kt");
+      if(kt&&kt.length>=5){
+        kt[1].textContent="今日实时 · 近6日走势";
+        kt[2].textContent="任务成功率 "+(rate==null?"—":rate)+"%";
+        kt[3].textContent="待你审批 · 点击前往";
+        kt[4].textContent="今日无消耗";
+      }
+    }
+
+    fillMiv(totalTasks,rate,dash,d);
+
+    /* 任务状态构成：中心数字与三段 */
+    var ovdn=el("#ovdn");
+    var realTotal=totalTasks||0;
+    if(ovdn){ try{ ovdn.textContent=realTotal; }catch(e){} }
+    if(realTotal){ setTimeout(function(){ var o2=el("#ovdn"); if(o2) o2.textContent=realTotal; },2400); }
+    if(rate!=null){ var seg=document.querySelectorAll("#miv .mivseg")[0]; if(seg) seg.setAttribute("stroke-dasharray",rate+" 100"); }
+    if(dash&&dash.tasks&&dash.tasks.by_status){
+      var bs2=dash.tasks.by_status;
+      var dV=(bs2.done||0)+(bs2.closed||0), rV=(bs2.running||0), wV=(bs2.pending||0)+(bs2.pending_exec||0)+(bs2.pending_deps||0);
+      var tV=totalTasks||(dV+rV+wV);
+      var lis=document.querySelectorAll("#ov2 .dlg .li");
+      if(lis&&lis.length>=3){
+        [[lis[0],dV],[lis[1],rV],[lis[2],wV]].forEach(function(s){
+          var v=s[1], p=tV?(Math.round(v/tV*1000)/10):0;
+          var pe=s[0].querySelector(".pct"), ve=s[0].querySelector(".v");
+          if(pe) pe.textContent=p+"%"; if(ve) ve.textContent=v;
+        });
+      }
+      var rings=[["#E63A84",dV],["#3BE7FF",rV],["#9B7BFF",wV]];
+      var off=0;
+      rings.forEach(function(r){
+        var cir=document.querySelector('#ov2 svg circle[stroke="'+r[0]+'"]');
+        if(cir){ var p=tV?(r[1]/tV*100):0; cir.setAttribute("stroke-dasharray",p+" 100"); cir.setAttribute("stroke-dashoffset",-off); off+=p; }
+      });
+    }
+
+    var bars=el("#ovbars"); if(bars) renderBars(bars,dash);
+    var alerts=el("#ovalerts"); if(alerts) renderAlerts(alerts,d,dash);
+    var trend=el("#ovtrend"); if(trend) renderTrend(trend,dash);
+    fillHealth(d,dash);
+    fillSentinel(waitN,d,dash);
+    return true;
+  }
+
+  /* 审批中心真卡 */
+  function applyApproval(){
+    if(!lastD) return;
+    var grid=document.getElementById("apprGrid"); if(!grid) return;
+    var pe=(lastD.approvals&&Array.isArray(lastD.approvals.pending_exec))?lastD.approvals.pending_exec:[];
+    var cnt=document.getElementById("apprCount"); if(cnt) cnt.textContent=pe.length;
+    if(!pe.length){ grid.innerHTML='<div style=\"color:var(--txt-3);padding:30px;text-align:center\">暂无待审批</div>'; return; }
+    grid.innerHTML="";
+    pe.forEach(function(t){
+      var a=document.createElement("div"); a.className="appr";
+      var st=t.approval==="returned"?"已打回":"待审批";
+      var who=String(t.target_app||"").replace(/^交付实施部-/, "");
+      a.innerHTML='<div class=\"a-top\"><span class=\"a-id\">#'+esc(String(t.id).slice(0,8))+'</span><span>'+esc(st)+'</span></div>'+
+        '<h5>'+esc(who+' 审批请求')+'</h5><p>该任务正在等待老板审批，处置请回到原系统。</p>'+
+        '<div class=\"a-meta\"><span>负责：'+esc(who)+'</span><span>创建 '+esc((t.created_at||"").slice(0,10))+'</span></div>'+
+        '<div class=\"a-btns\"><button class=\"btn-view\">详情</button><button class=\"btn-back\">打回</button><button class=\"btn-pass\">批准</button></div>';
+      var btns=a.querySelectorAll("button");
+      btns[0].onclick=function(){ toast("详情请回原系统查看，驾驶舱只读展示"); };
+      var onlyRead=function(){ toast("处置请回原系统执行，驾驶舱只读展示"); };
+      btns[1].onclick=onlyRead; btns[2].onclick=onlyRead;
+      grid.appendChild(a);
+    });
+  }
+  /* 任务中心真概览 */
+  function applyTasks(){
+    if(!lastD) return;
+    var ov=document.getElementById("taskOv"); if(!ov) return;
+    var dash=lastDash||{};
+    var total=(dash.tasks&&dash.tasks.total)?dash.tasks.total:"—";
+    var bs=(dash.tasks&&dash.tasks.by_status)||{};
+    var done=(bs.done||0)+(bs.closed||0);
+    var wait=(bs.pending||0)+(bs.pending_exec||0)+(bs.pending_deps||0);
+    var rate=dash.tasks&&typeof dash.tasks.success_rate==="number"?Math.round(dash.tasks.success_rate*1000)/10:"—";
+    function st(v,s2,t){ return '<div style=\"flex:1;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:14px\">'+(t?'<div style=\"font-size:11px;color:var(--txt-3);margin-bottom:6px\">'+t+'</div>':'')+'<div style=\"font-size:26px;font-weight:800\">'+v+'</div><div style=\"font-size:11px;color:var(--txt-3);margin-top:4px\">'+s2+'</div></div>'; }
+    ov.innerHTML='<div style=\"display:flex;gap:12px\">'+      st(total,"总任务（只读聚合）")+st(done+" 单 · "+rate+"%","已完成 · 成功率")+st(wait+" 条","待审批","点击前往审批")+'</div>';
+    Array.prototype.forEach.call(ov.querySelectorAll("div"),function(c){ if(c&&c.style&&c.style.cursor===undefined&&c.textContent.indexOf("待审批")>=0){ c.style.cursor="pointer"; c.onclick=function(){ var g=document.getElementById("apprGrid"); if(g) g.scrollIntoView({behavior:"smooth",block:"start"}); }; } });
+  }
+  window.__d4ApplyApproval=applyApproval;
+  window.__d4ApplyTasks=applyTasks;
+
+  function replayRoute(){
+    if(!lastD) return;
+    var route=(location.hash||"").replace(/^#/,"").split("/")[0]||"overview";
+    try{
+      if(route==="overview") applyReal(lastD,lastDash);
+      else if(route==="tasks"||route==="approval"){ applyTasks(); applyApproval(); }
+    }catch(e){}
+  }
+
+  var tried=0;
+  function tryLoad(){
+    Promise.all([
+      fetch("./data.json",{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.json(); }).catch(function(){return null;}),
+      fetch("./dashboard_stats.json",{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.json(); }).catch(function(){return null;})
+    ]).then(function(res){
+      var d=res[0], dash=res[1];
+      if(!d){ throw new Error("data.json unavailable"); }
+      applyReal(d,dash);
+      replayRoute();
+    }).catch(function(){
+      tried++;
+      if(tried<5) setTimeout(tryLoad,12000);
+    });
+  }
+  /* B 修复：60s 轮询重放真实数据，防止过期副本 */
+  function startPoll(){ setInterval(function(){
+    Promise.all([
+      fetch("./data.json",{cache:"no-store"}).then(function(r){ if(!r.ok) return null; return r.json(); }).catch(function(){return null;}),
+      fetch("./dashboard_stats.json",{cache:"no-store"}).then(function(r){ if(!r.ok) return null; return r.json(); }).catch(function(){return null;})
+    ]).then(function(res){
+      var d=res[0], dash=res[1];
+      if(d){ try{ applyReal(d,dash); }catch(e){} }
+      replayRoute();
+    }).catch(function(){});
+  },60000); }
+
+  if(document.readyState==="loading"){ document.addEventListener("DOMContentLoaded",function(){ tryLoad(); startPoll(); }); }
+  else { tryLoad(); startPoll(); }
+  window.addEventListener("hashchange",function(){
+    setTimeout(function(){
+      replayRoute();
+    },600);
+  });
+})();

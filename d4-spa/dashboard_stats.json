@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-25T10:29:24Z",
+  "interval_seconds": 60,
+  "data_status": "ok",
+  "tasks": {
+    "total": 69,
+    "by_day": [
+      {
+        "day": "2026-09-14",
+        "count": 2
+      },
+      {
+        "day": "2026-09-15",
+        "count": 30
+      },
+      {
+        "day": "2026-09-18",
+        "count": 3
+      },
+      {
+        "day": "2026-09-19",
+        "count": 20
+      },
+      {
+        "day": "2026-09-20",
+        "count": 11
+      },
+      {
+        "day": "2026-09-21",
+        "count": 3
+      }
+    ],
+    "by_status": {
+      "pending_deps": 0,
+      "pending": 0,
+      "pending_exec": 3,
+      "running": 0,
+      "retry_wait": 0,
+      "done": 59,
+      "error": 2,
+      "dead_letter": 0,
+      "blocked": 0,
+      "revoked": 4,
+      "closed": 1,
+      "released": 0
+    },
+    "success_rate": 0.9672,
+    "duration_seconds": {
+      "avg": 2.5,
+      "p50": 2.5,
+      "p90": 3.7
+    },
+    "by_source_app": [
+      {
+        "source_app": "助理-小墨",
+        "count": 2,
+        "done": 2,
+        "failed": 0
+      }
+    ]
+  },
+  "artifacts": {
+    "total": 22,
+    "by_type": {
+      "text": 22
+    },
+    "by_source_app": [
+      {
+        "source_app": "AI客服小景",
+        "count": 8
+      },
+      {
+        "source_app": "产品经理-小明",
+        "count": 3
+      },
+      {
+        "source_app": "交付实施部-开发人员(华安）",
+        "count": 2
+      },
+      {
+        "source_app": "交付实施部-开发人员(小强）",
+        "count": 2
+      },
+      {
+        "source_app": "助理-小墨",
+        "count": 2
+      },
+      {
+        "source_app": "交付实施部-如花（文案写作专家）",
+        "count": 1
+      },
+      {
+        "source_app": "售后部-运维工程师",
+        "count": 1
+      },
+      {
+        "source_app": "商机专员",
+        "count": 1
+      },
+      {
+        "source_app": "测试-0921窗口-③取证",
+        "count": 1
+      },
+      {
+        "source_app": "测试-0921窗口-③取证b",
+        "count": 1
+      }
+    ]
+  },
+  "audit": {
+    "total": 133,
+    "by_event_type": {
+      "approval.decided": 4,
+      "artifact.read_revoked": 3,
+      "dispatch.blocked": 1,
+      "dispatch.completed": 9,
+      "dispatch.deps_pending": 1,
+      "dispatch.received": 10,
+      "hmac.failed": 15,
+      "hmac.ok": 77,
+      "task.close": 1,
+      "task.released": 8,
+      "task.revoked": 4
+    },
+    "security_events": 18
+  },
+  "flow": {
+    "dispatch": 3,
+    "run": 0,
+    "retry": 0,
+    "dead_letter": 0,
+    "blocked": 0,
+    "done": 59,
+    "active": 3
+  }
+}

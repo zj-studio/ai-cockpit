@@ -1,0 +1,200 @@
+/* 知识图谱 · Obsidian 式力导向网（Canvas 2D，零依赖） v13
+ * 结构：无中心力导向网 —— 全部知识片段为白色小点，真实关系为细线，
+ *       拖拽拉扯、松手回弹、滚轮缩放、空白平移，hover/放大出标签。
+ * 数据：galaxy.json（362 片段 + 340 条真实关系）。
+ */
+(function () {
+  'use strict';
+  var MOUNT = 'galaxyMount';
+  var NODE_COLOR = 'rgba(205,214,230,0.9)';
+  var NODE_HOVER = 'rgba(240,245,255,1)';
+  var EDGE_COLOR = 'rgba(170,176,188,0.20)';
+  var EDGE_HOVER = 'rgba(225,232,245,0.55)';
+  var LABEL_THRESHOLD = 0.85; // 缩放达到该值显示全部标签
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function h32(v){v=String(v||'');var h=2166136261;for(var i=0;i<v.length;i++){h^=v.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0)/4294967296;}
+
+  window.__startGraphForce = function () {
+    var mount = document.getElementById(MOUNT);
+    if (!mount) return false;
+    if (mount.dataset.gfInit) return true;
+    mount.dataset.gfInit = '1';
+    var oldCv = mount.querySelectorAll('canvas');
+    for (var oi = 0; oi < oldCv.length; oi++) { if (oldCv[oi] && oldCv[oi].parentNode) oldCv[oi].parentNode.removeChild(oldCv[oi]); }
+
+    var data = window.__GALAXY_DATA__ || { nodes: [], edges: [], whitelist: [] };
+    var src = data.nodes || [];
+    var rawEdges = data.edges || [];
+
+    var canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:100%;height:100%;display:block;background:transparent;cursor:grab';
+    var ctx = canvas.getContext('2d');
+    mount.appendChild(canvas);
+
+    var W=1,H=1,DPR=1;
+    function size(){
+      DPR=Math.max(1,window.devicePixelRatio||1);
+      W=mount.clientWidth||window.innerWidth;
+      H=mount.clientHeight||window.innerHeight;
+      canvas.width=Math.round(W*DPR); canvas.height=Math.round(H*DPR);
+      ctx.setTransform(DPR,0,0,DPR,0,0);
+      warm();
+    }
+    window.__galaxyResize=size;
+
+    // ---- 节点与边 ----
+    var nodes=[], byId={}, edges=[], linkMap={};
+    function mk(o){ o.x=0;o.y=0;o.vx=0;o.vy=0;o.fx=0;o.fy=0;o.r=2.4; return o; }
+    src.forEach(function(s){
+      var n=mk({ id:s.id, label:(s.display_name||s.doc||s.id), doc:s.doc||'', preview:s.preview||'' });
+      nodes.push(n); byId[n.id]=n;
+    });
+    var edgeSeen={};
+    rawEdges.forEach(function(p){
+      if(!p||p.length<2) return;
+      var a=byId[p[0]], b=byId[p[1]];
+      if(!a||!b||a===b) return;
+      var k=a.id+'|'+b.id, k2=b.id+'|'+a.id;
+      if(edgeSeen[k]||edgeSeen[k2]) return;
+      edgeSeen[k]=1;
+      edges.push({a:a,b:b});
+      (linkMap[a.id]=linkMap[a.id]||{})[b.id]=1;
+      (linkMap[b.id]=linkMap[b.id]||{})[a.id]=1;
+    });
+    // 无真实关系的节点也保留（孤立点），与 Obsidian 一致
+    var N=nodes.length, E=edges.length;
+
+    function warm(){
+      var R=Math.min(W,H)*0.48;
+      for(var i=0;i<N;i++){
+        var n=nodes[i];
+        var ga=i*2.399963; var gr=Math.sqrt((i+0.5)/Math.max(1,N))*R;
+        n.home=[Math.cos(ga)*gr, Math.sin(ga)*gr];
+        n.x=n.home[0]; n.y=n.home[1];
+        n.x=n.home[0]; n.y=n.home[1]; n.vx=0; n.vy=0;
+      }
+    }
+
+    // ---- 力导向（Obsidian 手感：向心 + 斥力 + 弹簧） ----
+    var KH=0.006, KR=0.9, KS=0.16, DAMP=0.80, MAXV=16, REP=90;
+    function step(){
+      var i,j,n,m,dx,dy,d,f;
+      for(i=0;i<N;i++){
+        n=nodes[i];
+        n.fx=(-n.x)*KH; n.fy=(-n.y)*KH;
+      }
+      // 斥力（线性衰减大范围，保持节点分散不重叠）
+      for(i=0;i<N;i++){
+        n=nodes[i];
+        for(j=i+1;j<N;j++){
+          m=nodes[j];
+          dx=n.x-m.x; dy=n.y-m.y;
+          d=Math.sqrt(dx*dx+dy*dy)||0.01;
+          if(d>=REP) continue;
+          f=KR*(1-d/REP);
+          dx/=d; dy/=d;
+          n.fx+=dx*f; n.fy+=dy*f; m.fx-=dx*f; m.fy-=dy*f;
+        }
+      }
+      // 弹簧边
+      for(i=0;i<E;i++){
+        var e=edges[i]; n=e.a; m=e.b;
+        dx=m.x-n.x; dy=m.y-n.y; d=Math.max(0.01,Math.sqrt(dx*dx+dy*dy));
+        var rest=Math.min(W,H)*0.075;
+        f=KS*(d-rest); dx/=d; dy/=d;
+        n.fx+=dx*f; n.fy+=dy*f; m.fx-=dx*f; m.fy-=dy*f;
+      }
+      for(i=0;i<N;i++){
+        n=nodes[i];
+        if(dragNode===n){ n.vx=0; n.vy=0; continue; }
+        n.vx=(n.vx+n.fx)*DAMP; n.vy=(n.vy+n.fy)*DAMP;
+        if(n.vx>MAXV)n.vx=MAXV; else if(n.vx<-MAXV)n.vx=-MAXV;
+        if(n.vy>MAXV)n.vy=MAXV; else if(n.vy<-MAXV)n.vy=-MAXV;
+        n.x+=n.vx; n.y+=n.vy;
+        var CL=Math.min(W,H)*0.55;
+        if(n.x<-CL){n.x=-CL;n.vx*=0.5;} else if(n.x>CL){n.x=CL;n.vx*=0.5;}
+        if(n.y<-CL){n.y=-CL;n.vy*=0.5;} else if(n.y>CL){n.y=CL;n.vy*=0.5;}
+      }
+    }
+
+    var cam={z:1,x:0,y:0};
+    function SX(wx){return (wx-cam.x)*cam.z+W/2;}
+    function SY(wy){return (wy-cam.y)*cam.z+H/2;}
+    function WX(sx){return (sx-W/2)/cam.z+cam.x;}
+    function WY(sy){return (sy-H/2)/cam.z+cam.y;}
+
+    var hover=null,sel=null,dragNode=null,panning=false,moved=false,px0=0,py0=0,sx0=0,sy0=0,down=false;
+    function nodeAt(mx,my){
+      var best=null,bd=1e9;
+      for(var i=0;i<N;i++){
+        var n=nodes[i];
+        var dx=SX(n.x)-mx, dy=SY(n.y)-my;
+        var dd=Math.sqrt(dx*dx+dy*dy);
+        var rr=Math.max(6,2.4*cam.z+8);
+        if(dd<rr&&dd<bd){bd=dd;best=n;}
+      }
+      return best;
+    }
+    canvas.addEventListener('pointerdown',function(e){ var r=mount.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top; down=true; moved=false; px0=mx;py0=my;sx0=mx;sy0=my; var hit=nodeAt(mx,my); if(hit) dragNode=hit; else panning=true; canvas.style.cursor='grabbing'; });
+    window.addEventListener('pointermove',function(e){ var r=mount.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top; if(down&&(Math.abs(mx-sx0)+Math.abs(my-sy0)>4)) moved=true; if(down&&dragNode){ dragNode.x=WX(mx); dragNode.y=WY(my); } else if(down&&panning){ cam.x-=(mx-px0)/cam.z; cam.y-=(my-py0)/cam.z; } px0=mx;py0=my; hover= down?hover:nodeAt(mx,my); canvas.style.cursor= hover?'pointer':'grab'; });
+    window.addEventListener('pointerup',function(){ if(dragNode&&!moved) onSelect(dragNode); dragNode=null; panning=false; down=false; canvas.style.cursor='grab'; });
+    canvas.addEventListener('wheel',function(e){ e.preventDefault(); var f=e.deltaY<0?1.12:0.89; cam.z=Math.min(3.2,Math.max(0.45,cam.z*f)); },{passive:false});
+
+    var tip=null;
+    function ensureTip(){ if(tip) return tip; tip=document.createElement('div'); tip.style.cssText='position:absolute;z-index:5;max-width:240px;padding:9px 12px;border-radius:10px;font-size:11.5px;line-height:1.5;color:#EAF0FF;background:rgba(10,15,32,.92);border:1px solid rgba(120,160,255,.3);box-shadow:0 8px 26px rgba(0,0,0,.5);display:none;pointer-events:none'; mount.appendChild(tip); return tip; }
+    function onSelect(n){ var t=ensureTip();
+      t.innerHTML='<div style="font-weight:700;color:#F2F6FF">'+esc(n.label)+'</div>'+
+        (n.doc?'<div style="color:#9AA7C7;margin-top:3px">'+esc(n.doc)+'</div>':'')+
+        (n.preview?'<div style="margin-top:5px;color:#5E6B8D;font-size:10.5px">'+esc(n.preview.slice(0,80))+'</div>':'');
+      t.style.display='block'; t.style.left='16px'; t.style.top='14px'; sel=n; }
+
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      var focus=hover||sel, rel=null, tnow=performance.now()/1000;
+      if(focus){ rel={}; rel[focus.id]=1; var ks=linkMap[focus.id]?Object.keys(linkMap[focus.id]):[]; for(var q=0;q<ks.length;q++) rel[ks[q]]=1; }
+      var e,i,n;
+      // 边：细、淡
+      for(e=0;e<E;e++){
+        var en=edges[e];
+        var active=focus&&rel[en.a.id]&&rel[en.b.id];
+        var x1=SX(en.a.x),y1=SY(en.a.y),x2=SX(en.b.x),y2=SY(en.b.y);
+        ctx.strokeStyle= active?EDGE_HOVER:(focus?EDGE_COLOR.replace('0.16','0.05'):EDGE_COLOR);
+        ctx.lineWidth= active?1:0.6;
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      }
+      // 节点：白色小点
+      for(i=0;i<N;i++){
+        n=nodes[i];
+        var x=SX(n.x),y=SY(n.y),rr=Math.max(1.6,n.r*cam.z);
+        var on=!focus||rel[n.id];
+        ctx.globalAlpha=(focus&&!on)?0.12:1;
+        ctx.beginPath(); ctx.arc(x,y,rr,0,6.283);
+        ctx.fillStyle= focus===n?NODE_HOVER:NODE_COLOR;
+        ctx.fill();
+        if(focus===n){ ctx.lineWidth=1; ctx.strokeStyle='rgba(240,245,255,.75)'; ctx.beginPath(); ctx.arc(x,y,rr+2.6,0,6.283); ctx.stroke(); }
+      }
+      ctx.globalAlpha=1;
+      // 标签：hover 或放大到阈值
+      var showAll = cam.z>=LABEL_THRESHOLD;
+      for(i=0;i<N;i++){
+        n=nodes[i];
+        if(!showAll && focus!==n) continue;
+        var lx=SX(n.x), ly=SY(n.y);
+        var on2=!focus||rel[n.id];
+        ctx.globalAlpha=(focus&&!on2)?0.12:0.92;
+        ctx.font=(focus===n?'600 12px ':'400 11px ')+'"PingFang SC","Microsoft YaHei",sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='top';
+        ctx.fillStyle= focus===n?'rgba(240,245,255,.98)':'rgba(178,192,216,.85)';
+        ctx.fillText(n.label, lx, ly+Math.max(1.6,n.r*cam.z)+5);
+      }
+      ctx.globalAlpha=1;
+    }
+    function loop(){ step(); draw(); requestAnimationFrame(loop); }
+    size();
+    requestAnimationFrame(loop);
+    window.__kgNodes=nodes.slice(0,400).map(function(n){return {x:n.x,y:n.y,home:n.home.slice()}}); window.__galaxyReady=true;
+    window.__galaxyInfo={ nodes:N, edges:E, dataNodes:src.length, docs:(data.whitelist||[]).length, realEdges:E };
+    return true;
+  };
+})();
+

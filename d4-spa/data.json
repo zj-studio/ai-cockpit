@@ -1,0 +1,380 @@
+{
+  "generated_at": "2026-09-25T18:30:18",
+  "services": [
+    {
+      "name": "executor",
+      "status": 200,
+      "ms": 10
+    },
+    {
+      "name": "portal",
+      "status": 200,
+      "ms": 12
+    },
+    {
+      "name": "research",
+      "status": 200,
+      "ms": 26,
+      "dataSource": "iFinD（个股/选股）+ Wind（指数/宏观/资金面）"
+    },
+    {
+      "name": "cockpit",
+      "status": 401,
+      "ms": 15,
+      "auth": "basic"
+    },
+    {
+      "name": "relay-gateway",
+      "status": 200,
+      "ms": 0,
+      "port_probe": true
+    },
+    {
+      "name": "nginx",
+      "status": 200,
+      "ms": 0,
+      "port_probe": true
+    },
+    {
+      "name": "postgres",
+      "status": 200,
+      "ms": 0,
+      "port_probe": true,
+      "note": "docker-db_postgres-1"
+    }
+  ],
+  "employees": [
+    {
+      "id": 1,
+      "name": "助理-小墨",
+      "dept": "综合部",
+      "role": "项目经理·初墨B角：接单·派单·盯交付·验收",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/nikSfZ7kk5KS0E2F"
+    },
+    {
+      "id": 2,
+      "name": "商机专员-伯虎",
+      "dept": "业务部",
+      "role": "商机线索·谈单话术·推动成单",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/KtAYHulZPAlFYRx1"
+    },
+    {
+      "id": 3,
+      "name": "产品经理-小明",
+      "dept": "业务部",
+      "role": "产品架构设计·PRD·功能定义·制作分流建议",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/YWCmu6v6EGhHFq4P"
+    },
+    {
+      "id": 4,
+      "name": "图片设计师-秋香",
+      "dept": "交付实施部",
+      "role": "PPT·图片视觉内容制作",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/kzuKx4GxLLm7H8fQ"
+    },
+    {
+      "id": 5,
+      "name": "视频设计师-书生",
+      "dept": "交付实施部",
+      "role": "视频策划·剪辑·制作",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/e3WiCC45sFfW15ec"
+    },
+    {
+      "id": 6,
+      "name": "开发-小强",
+      "dept": "交付实施部",
+      "role": "技术方案·开发·测试",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/kO7eX3oq9adPqu59"
+    },
+    {
+      "id": 7,
+      "name": "文案-如花",
+      "dept": "交付实施部",
+      "role": "文案写作专家·内容策划",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/SI4zeAga6FJxLF5Q"
+    },
+    {
+      "id": 8,
+      "name": "运维工程师-机器猫",
+      "dept": "售后部",
+      "role": "排障·巡检·优化·安全检查",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/QaEmInMSfBXi3tzE"
+    },
+    {
+      "id": 9,
+      "name": "AI客服小景",
+      "dept": "客服部",
+      "role": "对外AI客服·咨询接待·7x24在线",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/hlQrVT9GSVE74JAn"
+    },
+    {
+      "id": 10,
+      "name": "开发-华安",
+      "dept": "交付实施部",
+      "role": "工程开发 · trae-cli 在岗",
+      "status": "online",
+      "locked": false,
+      "model": "deepseek-v4-flash",
+      "chat_url": "http://150.158.115.88/chat/hUNkSSvpom1aYDyz"
+    }
+  ],
+  "tasks": {
+    "queued": 0,
+    "running": 0,
+    "done_today": 0,
+    "recent": []
+  },
+  "approvals": {
+    "pending_count": 0,
+    "pending": [],
+    "pending_exec": [
+      {
+        "id": "60f017c3a66044debe541967f53627fa",
+        "target_app": "交付实施部-图片设计师",
+        "approval": "pending",
+        "created_at": "2026-09-19T21:09:35Z"
+      },
+      {
+        "id": "f1c3789fe95241728ca3db45406e37f6",
+        "target_app": "交付实施部-图片设计师",
+        "approval": "pending",
+        "created_at": "2026-09-19T21:09:29Z"
+      },
+      {
+        "id": "c2ed2a9ac06b9b7d68e33e6c9cf32136",
+        "target_app": "图片设计师",
+        "approval": "returned",
+        "created_at": "2026-09-15T18:33:48Z"
+      }
+    ]
+  },
+  "gateway": {
+    "whitelist": "on",
+    "codex": "online",
+    "trae": "online"
+  },
+  "knowledge": {
+    "layers": [
+      {
+        "id": "raw_leads",
+        "name": "原始线索",
+        "count": 0,
+        "items": []
+      },
+      {
+        "id": "dify_kb",
+        "name": "Dify知识库",
+        "count": 3,
+        "items": [
+          {
+            "name": "交付设计规范库",
+            "updated_at": "2026-09-06T16:18:27"
+          },
+          {
+            "name": "业务营销库",
+            "updated_at": "2026-09-06T16:18:24"
+          },
+          {
+            "name": "技术运维SOP库",
+            "updated_at": "2026-09-06T16:18:17"
+          }
+        ]
+      },
+      {
+        "id": "methods",
+        "name": "方法库·手册SOP",
+        "count": 22,
+        "items": [
+          {
+            "name": "Dify平台操作备忘.md",
+            "size": 11823,
+            "updated_at": "2026-09-04T03:32:48"
+          },
+          {
+            "name": "Steel_OpenAPI_schema.json",
+            "size": 38272,
+            "updated_at": "2026-09-04T03:51:20"
+          },
+          {
+            "name": "Steel_docker-compose.yml",
+            "size": 630,
+            "updated_at": "2026-09-04T03:51:20"
+          },
+          {
+            "name": "Steel浏览器自部署说明书_旺财执行.md",
+            "size": 5934,
+            "updated_at": "2026-09-04T02:02:42"
+          },
+          {
+            "name": "业务部-商务拓展_导出原件.yml",
+            "size": 6282,
+            "updated_at": "2026-09-04T02:02:47"
+          },
+          {
+            "name": "业务部-市场规划.yml",
+            "size": 4891,
+            "updated_at": "2026-09-04T02:02:48"
+          },
+          {
+            "name": "交付实施部-图片设计师.yml",
+            "size": 3185,
+            "updated_at": "2026-09-04T03:09:54"
+          },
+          {
+            "name": "交付实施部-开发人员.yml",
+            "size": 4212,
+            "updated_at": "2026-09-04T02:02:51"
+          },
+          {
+            "name": "交付实施部-视频设计师.yml",
+            "size": 3164,
+            "updated_at": "2026-09-04T03:09:55"
+          },
+          {
+            "name": "交付实施部-项目经理.yml",
+            "size": 4055,
+            "updated_at": "2026-09-04T02:02:51"
+          },
+          {
+            "name": "员工门户_index.html",
+            "size": 11510,
+            "updated_at": "2026-09-04T03:08:31"
+          },
+          {
+            "name": "回复_20260904_P08-Steel_方案A复测报告.md",
+            "size": 5627,
+            "updated_at": "2026-09-04T04:27:32"
+          },
+          {
+            "name": "回复_20260904_P08-Steel补装完成报告.md",
+            "size": 12716,
+            "updated_at": "2026-09-04T03:54:24"
+          },
+          {
+            "name": "回复_20260904_P10_投研平台部署完成.md",
+            "size": 2937,
+            "updated_at": "2026-09-04T22:08:42"
+          },
+          {
+            "name": "完成_20260904_P10_投研平台部署.md",
+            "size": 4255,
+            "updated_at": "2026-09-04T22:08:42"
+          },
+          {
+            "name": "完成_20260904_P11_审批网关与第7名员工.md",
+            "size": 7080,
+            "updated_at": "2026-09-04T13:46:28"
+          },
+          {
+            "name": "投研平台交接说明.md",
+            "size": 5783,
+            "updated_at": "2026-09-04T13:46:28"
+          },
+          {
+            "name": "投研平台整合方案_v1.md",
+            "size": 6885,
+            "updated_at": "2026-09-04T23:39:35"
+          },
+          {
+            "name": "新Agent_DSL样本_说明_无法导出.md",
+            "size": 3858,
+            "updated_at": "2026-09-04T03:08:04"
+          },
+          {
+            "name": "服务器执行器与门户部署说明书_旺财执行.md",
+            "size": 8057,
+            "updated_at": "2026-09-04T02:02:43"
+          },
+          {
+            "name": "设计工作室_员工搭建手册.md",
+            "size": 23153,
+            "updated_at": "2026-09-04T02:02:44"
+          },
+          {
+            "name": "运维手册_服务器与门户.md",
+            "size": 12581,
+            "updated_at": "2026-09-04T03:55:30"
+          }
+        ]
+      },
+      {
+        "id": "outputs",
+        "name": "成果输出",
+        "count": 0,
+        "items": []
+      }
+    ],
+    "flows": [
+      {
+        "from": "raw_leads",
+        "to": "dify_kb"
+      },
+      {
+        "from": "dify_kb",
+        "to": "methods"
+      },
+      {
+        "from": "methods",
+        "to": "outputs"
+      }
+    ]
+  },
+  "leads": {
+    "count": 0,
+    "recent": []
+  },
+  "usage": {
+    "tokens_today": 0,
+    "updated_at": "2026-09-25T18:30:18",
+    "bocha": {
+      "remaining": 697,
+      "alert": false,
+      "checked_at": "2026-09-25T09:00:01",
+      "expires": "2026-12-06"
+    },
+    "today_calls": 0
+  },
+  "sys": {
+    "load1": 0.54150390625,
+    "load5": 0.4736328125,
+    "load15": 0.40234375,
+    "mem_total": 8122077184,
+    "mem_available": 3654742016,
+    "swap_total": 4294963200,
+    "swap_used": 14761984,
+    "disk_total": 84423806976,
+    "disk_used": 33756839936,
+    "disk_avail": 47107248128,
+    "uptime_sec": 787479,
+    "net_rx": 575598559469,
+    "net_tx": 266713179974,
+    "cpu_cores": 2
+  }
+}

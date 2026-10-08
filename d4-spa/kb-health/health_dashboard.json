@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-09-30T14:30:03.011101",
+  "pushed_at": "2026-09-30 14:30:03",
+  "overview": {
+    "docs": 357,
+    "slices": 10064,
+    "sources_scanned": 357,
+    "missing_count": 0,
+    "missing_sources": []
+  },
+  "by_dataset": {
+    "CFA资料库": {
+      "docs": 95,
+      "slices": 4939
+    },
+    "权限样例": {
+      "docs": 2,
+      "slices": 2
+    },
+    "研读库": {
+      "docs": 260,
+      "slices": 5123
+    }
+  },
+  "freshness": {
+    "stale_threshold_days": 90,
+    "stale_count": 0,
+    "stale_docs": [],
+    "total_docs_with_mtime": 357
+  },
+  "accuracy": {
+    "raw_total_queries": 51,
+    "raw_hit_queries": 51,
+    "total_queries": 45,
+    "hit_queries": 45,
+    "hit_rate": 1.0,
+    "avg_hit_count": 3.0,
+    "excluded_test_count": 6,
+    "no_hit_queries": [],
+    "low_confidence_threshold": 0.6,
+    "low_confidence_count": 0,
+    "low_confidence_queries": [],
+    "by_agent": {
+      "9527": {
+        "queries": 9,
+        "hits": 9
+      },
+      "boss": {
+        "queries": 9,
+        "hits": 9
+      },
+      "chumo": {
+        "queries": 9,
+        "hits": 9
+      },
+      "wangcai": {
+        "queries": 9,
+        "hits": 9
+      },
+      "yanzhou": {
+        "queries": 9,
+        "hits": 9
+      }
+    }
+  },
+  "changes": {
+    "last_apply": "20260928_232227",
+    "total_applies": 10,
+    "recent": [
+      {
+        "ts": "20260928_191806",
+        "action": "apply",
+        "added": 0,
+        "changed": 0,
+        "removed": 1,
+        "deprecated": 0,
+        "slices_after": 10064,
+        "backup": "G:\\Codex\\rag-data\\faiss_obsidian\\backups\\20260928_191806"
+      },
+      {
+        "ts": "20260928_194054",
+        "action": "apply",
+        "added": 1,
+        "changed": 0,
+        "removed": 0,
+        "deprecated": 0,
+        "slices_after": 10065,
+        "backup": "G:\\Codex\\rag-data\\faiss_obsidian\\backups\\20260928_194054"
+      },
+      {
+        "ts": "20260928_194240",
+        "action": "apply",
+        "added": 0,
+        "changed": 0,
+        "removed": 1,
+        "deprecated": 0,
+        "slices_after": 10064,
+        "backup": "G:\\Codex\\rag-data\\faiss_obsidian\\backups\\20260928_194240"
+      },
+      {
+        "ts": "20260928_232227",
+        "action": "apply",
+        "added": 261,
+        "changed": 0,
+        "removed": 0,
+        "deprecated": 0,
+        "slices_after": 15188,
+        "backup": "G:\\Codex\\rag-data\\faiss_obsidian\\backups\\20260928_232227"
+      },
+      {
+        "ts": "20260928_233835",
+        "action": "init_manifest",
+        "docs": 357,
+        "backup": "G:\\Codex\\rag-data\\faiss_obsidian\\backups\\20260928_233835"
+      }
+    ]
+  }
+}

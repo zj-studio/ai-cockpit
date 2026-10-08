@@ -1,0 +1,280 @@
+/* 知识图谱 · Obsidian 风格力导向网络（Canvas 2D，零依赖） v5
+ * 真实力导向物理：节点相互斥力 + 有边节点弹簧引力 + 中心归位 + 低速阻尼 = 持续流动。
+ * 交互：拖拽节点带惯性回弹、滚轮缩放、空白拖拽平移、悬停/点击聚焦关联节点其余淡化、标签随动。
+ * 与驾驶舱深色星空背景相容，画布透明，节点彩色圆点 + 中文标签。
+ */
+(function () {
+  'use strict';
+  var MOUNT = 'galaxyMount';
+
+  function hex2rgb(h) {
+    h = String(h || '').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16) || 0;
+    return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
+  }
+  function rgb(r, a) { return 'rgba(' + Math.round(r[0] * 255) + ',' + Math.round(r[1] * 255) + ',' + Math.round(r[2] * 255) + ',' + (a == null ? 1 : a) + ')'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+  function h32(v) { v = String(v || ''); var h = 2166136261; for (var i = 0; i < v.length; i++) { h ^= v.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
+
+  var LIB_COLORS = ['#3DDCA0', '#7CF5FB', '#B39DFF', '#FF9BD2', '#F5C66B', '#FFA48F', '#8BE9FD', '#9CE66A'];
+
+  window.__startGraphForce = function () {
+    var mount = document.getElementById(MOUNT);
+    if (!mount) return false;
+    if (mount.dataset.gfStarted) return true;
+    mount.dataset.gfStarted = '1';
+
+    var data = window.__GALAXY_DATA__ || { whitelist: [], nodes: [], edges: [] };
+    var libs = (data.whitelist || []).slice();
+
+    var canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:100%;height:100%;display:block;background:transparent;cursor:grab';
+    var ctx = canvas.getContext('2d');
+    mount.appendChild(canvas);
+
+    var W = 1, H = 1;
+    function size() {
+      var dpr = Math.max(1, window.devicePixelRatio || 1);
+      W = mount.clientWidth || window.innerWidth;
+      H = mount.clientHeight || window.innerHeight;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    size();
+    window.__galaxyResize = size;
+
+    /* ---- 图数据 ---- */
+    var nodes = [];   // {id,label,kind,color,r,deg,x,y,vx,vy,fx,fy,mass,lib,doc,preview}
+    var byId = {};
+    var edges = [];   // {a,b,lib}
+    var linkMap = {}; // id -> Set of ids
+
+    // 中心总库
+    nodes.push({ id: 'ROOT', label: '知识总库', short: '总库', kind: 'root', color: [0.92, 0.96, 1], r: 30, x: 0, y: 0, vx: 0, vy: 0, mass: 6 });
+    byId['ROOT'] = nodes[0];
+
+    libs.forEach(function (ds, i) {
+      var n = { id: 'LIB:' + ds, label: '『' + ds + '』', short: ds, kind: 'lib', color: hex2rgb(LIB_COLORS[i % LIB_COLORS.length]), r: 18, x: 0, y: 0, vx: 0, vy: 0, mass: 3, lib: i };
+      nodes.push(n); byId[n.id] = n;
+    });
+
+    (data.nodes || []).forEach(function (s) {
+      var li = Math.max(0, libs.indexOf(s.dataset));
+      var n = { id: s.id, label: s.display_name || s.doc || s.id, short: (s.display_name || s.doc || s.id), kind: 'seg', color: hex2rgb(LIB_COLORS[li % LIB_COLORS.length]), r: 8, x: 0, y: 0, vx: 0, vy: 0, mass: 1.2, lib: li, doc: s.doc || '', preview: s.preview || '' };
+      nodes.push(n); byId[n.id] = n;
+    });
+
+    var N = nodes.length;
+    function deg(id) {
+      var set = linkMap[id]; return set ? set.size : 0;
+    }
+
+    // 边：总库->库（无）; 库->片段; 片段->片段
+    function addEdge(a, b) {
+      if (!a || !b || a === b) return;
+      if (edges.some(function (e) { return (e.a === a && e.b === b) || (e.a === b && e.b === a); })) return;
+      var lib = a.charAt(0) === 'L' ? byId[a].lib : (b.charAt(0) === 'L' ? byId[b].lib : 0);
+      edges.push({ a: a, b: b, lib: lib });
+      (linkMap[a] = linkMap[a] || new Set()).add(b);
+      (linkMap[b] = linkMap[b] || new Set()).add(a);
+    }
+    libs.forEach(function (ds) { addEdge('ROOT', 'LIB:' + ds); });
+    (data.nodes || []).forEach(function (s) { addEdge('LIB:' + s.dataset, s.id); });
+    (data.edges || []).forEach(function (e) { addEdge(e[0], e[1]); });
+
+    // 初值：环形铺开 + 轻微抖动
+    (function init() {
+      var cx = 0, cy = 0;
+      var RC = Math.min(W, H) * 0.34;
+      nodes.forEach(function (n, i) {
+        var a = (i / Math.max(1, N)) * Math.PI * 2 + h32(n.id) * 0.7;
+        var rr = RC * (0.5 + 0.5 * h32('r' + n.id));
+        n.x = Math.cos(a) * rr + (h32('x' + n.id) - 0.5) * 30;
+        n.y = Math.sin(a) * rr + (h32('y' + n.id) - 0.5) * 30;
+      });
+    })();
+
+    /* ---- 力导向 ---- */
+    var drag = null, dragging = false, down = false, moved = false, px = 0, py = 0, sx = 0, sy = 0;
+    var cam = { z: 1, ox: 0, oy: 0 };
+    var hover = null, sel = null;
+    var REQ = 1.0;   // 斥力系数
+    var SPR = 0.045; // 弹簧
+    var GRAV = 0.006;
+    var DAMP = 0.88;
+    var REST = 90;   // 目标边长(屏幕px 中等)
+
+    function world(mx, my) { return { x: (mx - W / 2) / cam.z - cam.ox, y: (my - H / 2) / cam.z - cam.oy }; }
+    function screen(wx, wy) { return { x: (wx + cam.ox) * cam.z + W / 2, y: (wy + cam.oy) * cam.z + H / 2 }; }
+
+    function step() {
+      var i, j, n, m, dx, dy, d2, d, fx, fy, k;
+      // 施力
+      for (i = 0; i < N; i++) { nodes[i].fx = 0; nodes[i].fy = 0; }
+      // 斥力 O(N^2)
+      for (i = 0; i < N; i++) {
+        for (j = i + 1; j < N; j++) {
+          n = nodes[i]; m = nodes[j];
+          dx = n.x - m.x; dy = n.y - m.y;
+          d2 = dx * dx + dy * dy + 1;
+          d = Math.sqrt(d2);
+          var f = REQ * (n.mass * m.mass) / d2;
+          var fx = dx / d * f, fy = dy / d * f;
+          n.fx += fx; n.fy += fy; m.fx -= fx; m.fy -= fy;
+        }
+      }
+      // 弹簧引力
+      for (i = 0; i < edges.length; i++) {
+        n = byId[edges[i].a]; m = byId[edges[i].b];
+        dx = n.x - m.x; dy = n.y - m.y;
+        d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        var rest = REST * (n.kind === 'root' ? 1.4 : 1);
+        var s = SPR * (d - rest);
+        var fx = dx / d * s, fy = dy / d * s;
+        n.fx -= fx; n.fy -= fy; m.fx += fx; m.fy += fy;
+      }
+      // 中心归位 + 阻尼 + 积分
+      for (i = 0; i < N; i++) {
+        n = nodes[i];
+        n.fx += -n.x * GRAV * n.mass;
+        n.fy += -n.y * GRAV * n.mass;
+        if (drag === n && dragging) { n.vx = 0; n.vy = 0; continue; }
+        n.vx = (n.vx + n.fx) * DAMP;
+        n.vy = (n.vy + n.fy) * DAMP;
+        n.x += n.vx; n.y += n.vy;
+      }
+    }
+
+    function nodeAt(mx, my) {
+      var w = world(mx, my), best = null, bd = 1e9;
+      for (var i = 0; i < N; i++) {
+        var n = nodes[i];
+        var dx = n.x - w.x, dy = n.y - w.y;
+        var dd = Math.max(1, (n.r + (n.kind === 'root' ? 10 : n.kind === 'lib' ? 8 : 5)) * cam.z * 0.9);
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < dd && dist < bd) { bd = dist; best = n; }
+      }
+      return best;
+    }
+
+    function short(s) { s = String(s || ''); return s.length > 10 ? s.slice(0, 10) + '…' : s; }
+
+    canvas.addEventListener('pointerdown', function (e) {
+      down = true; moved = false;
+      var r = mount.getBoundingClientRect();
+      var mx = e.clientX - r.left, my = e.clientY - r.top;
+      sx = mx; sy = my; px = mx; py = my;
+      var hit = nodeAt(mx, my);
+      drag = hit || 'pan';
+      canvas.style.cursor = hit ? 'grabbing' : 'grabbing';
+      dragging = hit != null;
+    });
+    window.addEventListener('pointermove', function (e) {
+      var r = mount.getBoundingClientRect();
+      var mx = e.clientX - r.left, my = e.clientY - r.top;
+      if (down && Math.hypot(mx - sx, my - sy) > 3) moved = true;
+      if (down && drag === 'pan') { cam.ox += (mx - px) / cam.z; cam.oy += (my - py) / cam.z; }
+      else if (down && dragging && drag) { var w = world(mx, my); drag.x = w.x; drag.y = w.y; }
+      px = mx; py = my;
+      hover = down ? hover : nodeAt(mx, my);
+    });
+    window.addEventListener('pointerup', function () {
+      if (drag && drag !== 'pan' && !moved) onSelect(drag);
+      if (drag && drag !== 'pan') dragging = false;
+      drag = null; down = false; canvas.style.cursor = 'grab';
+    });
+    canvas.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      var f = e.deltaY < 0 ? 1.12 : 0.89;
+      cam.z = Math.min(3, Math.max(0.35, cam.z * f));
+    }, { passive: false });
+
+    /* 详情浮层 */
+    var tip = null;
+    function ensureTip() {
+      if (tip) return tip;
+      tip = document.createElement('div');
+      tip.style.cssText = 'position:absolute;z-index:5;max-width:240px;padding:9px 12px;border-radius:10px;font-size:11.5px;line-height:1.5;color:#EAF0FF;background:rgba(10,15,32,.92);border:1px solid rgba(120,160,255,.3);box-shadow:0 8px 26px rgba(0,0,0,.5);display:none;pointer-events:none';
+      mount.appendChild(tip); return tip;
+    }
+    function onSelect(n) {
+      var t = ensureTip(); var c = n.color;
+      if (n.kind === 'seg') t.innerHTML = '<div style="font-weight:700;color:' + rgb(c, 1) + ';margin-bottom:3px">' + esc(n.label) + '</div><div style="font-size:11px;color:#9AA7C7">库：' + esc(libs[n.lib] || '') + ' · ' + deg(n.id) + ' 条关联</div>' + (n.preview ? '<div style="margin-top:5px;color:#5E6B8D;font-size:10.5px">' + esc(n.preview) + '</div>' : '');
+      else if (n.kind === 'lib') t.innerHTML = '<div style="font-weight:700;color:' + rgb(c, 1) + '">' + esc(n.short) + '</div><div style="color:#9AA7C7;margin-top:3px">' + deg(n.id) + ' 个知识条目</div>';
+      else t.innerHTML = '<div style="font-weight:700;color:#EAF0FF">' + esc(n.label) + '</div><div style="color:#9AA7C7;margin-top:3px">共 ' + N + ' 节点</div>';
+      t.style.display = 'block'; t.style.left = '16px'; t.style.top = '14px'; sel = n;
+    }
+
+    /* ---- 渲染 ---- */
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      var focused = hover || sel;
+      // 存放屏幕坐标
+      var sp = nodes.map(function (n) { return screen(n.x, n.y); });
+      // 相关集合
+      var related = new Set();
+      if (focused) {
+        related.add(focused);
+        linkMap[focused.id] && linkMap[focused.id].forEach(function (x) { related.add(byId[x]); });
+      }
+      // 边
+      for (var e = 0; e < edges.length; e++) {
+        var en = edges[e];
+        var ai = nodes.indexOf(byId[en.a]); var bi = nodes.indexOf(byId[en.b]); var a = sp[ai], b = sp[bi];
+        var b = sp[nodes.indexOf(byId[en.b])];
+        if (!a || !b) continue;
+        var active = focused && (related.has(byId[en.a]) && related.has(byId[en.b]));
+        ctx.globalAlpha = focused ? (active ? 0.85 : 0.10) : 0.34;
+        if (active) {
+          ctx.strokeStyle = rgb(byId[en.a].color, 1);
+          ctx.lineWidth = 1.6;
+        } else {
+          ctx.strokeStyle = 'rgba(140,166,255,.5)';
+          ctx.lineWidth = 1;
+        }
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // 节点
+      nodes.forEach(function (n, idx) {
+        var s = sp[idx]; var c = n.color;
+        var connected = focused ? (related.has(n)) : true;
+        if (focused && !connected) { ctx.globalAlpha = 0.18; } else { ctx.globalAlpha = 1; }
+        var rr = n.r + (focused === n ? 7 : 0);
+        // 光晕
+        ctx.shadowColor = rgb(c, 1); ctx.shadowBlur = focused === n ? 22 : 9;
+        ctx.beginPath(); ctx.arc(s.x, s.y, rr, 0, 6.283);
+        ctx.fillStyle = n.kind === 'root' ? 'rgba(232,244,255,.22)' : rgb(c, 0.92);
+        ctx.fill(); ctx.shadowBlur = 0;
+        if (n.kind === 'root') { ctx.beginPath(); ctx.arc(s.x, s.y, rr, 0, 6.283); ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = 2; ctx.stroke(); }
+        // 标签
+        var show = n.kind === 'root' || n.kind === 'lib' || cam.z > 1.1 || focused === n || connected === false ? false : false;
+        show = n.kind === 'root' || n.kind === 'lib' || cam.z > 1.15 || focused === n;
+        if (show) {
+          ctx.globalAlpha = focused && !connected ? 0.22 : 0.95;
+          ctx.font = (n.kind === 'root' ? '700 ' : '500 ') + (n.kind === 'lib' ? 12 : 11) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+          ctx.fillStyle = n.kind === 'root' ? '#EAF0FF' : rgb(c, 1);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          var lab = n.kind === 'lib' ? n.short : short(n.short);
+          ctx.fillText(lab, s.x, s.y + rr + 6);
+        }
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    var t0 = performance.now();
+    function loop() {
+      var frames = 1; // 每帧一次物理步进
+      for (var s = 0; s < frames; s++) step();
+      // 相机归零居中第一个稳定帧
+      draw();
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+    window.__galaxyReady = true;
+    return true;
+  };
+})();
+
