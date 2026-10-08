@@ -3,3 +3,5 @@ backups/
 .DS_Store
 Thumbs.db
 
+*.bak*
+*.0039
